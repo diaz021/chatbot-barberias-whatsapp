@@ -3,6 +3,8 @@
 **Los clientes reservan, cancelan y reciben recordatorios de su turno por WhatsApp, sin llamar ni esperar respuesta.** Un solo sistema atiende a varias barberías a la vez, y cada barbero administra su agenda desde un panel web.
 
 > 🟢 **En producción** desde septiembre de 2026, atendiendo clientes reales de una barbería en Colombia.
+>
+> Es la **segunda versión**. La primera, con Google Sheets como base de datos y también en producción, es [**chatbot-barberia-sheets**](https://github.com/diaz021/chatbot-barberia-sheets).
 
 ![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
