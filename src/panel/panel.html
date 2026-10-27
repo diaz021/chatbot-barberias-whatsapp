@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="/panel/favicon.png">
+<title>Panel · Agenda</title>
+<style>
+  /*
+    PANEL — neón sobre negro.
+
+    ⚠️ El acento (--ac) NO está fijo: lo pone el JS con el color de la
+    barbería que se abre. Este panel lo usan TODAS las barberías, y dejar
+    el morado de la barbería piloto escrito aquí haría que la barbería 2 entrara
+    a los colores de otro negocio.
+
+    El brillo se reserva para lo interactivo: botones, foco, el día de hoy.
+    El texto que hay que leer todo el día va sin glow, que cansa la vista.
+  */
+  :root{
+    --ac:#9A4DEF;                        /* lo sobrescribe la barbería */
+    --ac-luz:#C08CFF;
+    --ac-humo:rgba(154,77,239,.15);
+    --ac-brillo:rgba(154,77,239,.55);
+
+    --negro:#07070A; --fondo:#0B0C11; --panel:#12141B; --panel-2:#191C25;
+    --linea:#242936; --linea-2:#1B1F29;
+    --texto:#E8EBF0; --texto-2:#98A2B3; --texto-3:#5D6676;
+
+    --libre:#00E5A0; --libre-fondo:rgba(0,229,160,.07);
+    --ocupado:#FF5C7A; --ocupado-fondo:rgba(255,92,122,.09);
+    --bloqueo:#FFB020; --bloqueo-fondo:rgba(255,176,32,.09);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1100px 520px at 12% -8%, var(--ac-humo), transparent 62%),
+      radial-gradient(900px 460px at 92% 4%, rgba(0,229,160,.05), transparent 60%),
+      var(--negro);
+    background-attachment:fixed;
+    color:var(--texto);
+    font:15px/1.55 "Segoe UI",system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input,select,textarea{font:inherit;color:inherit}
+  [hidden]{display:none!important}
+  ::selection{background:var(--ac);color:#fff}
+
+  /* ── Pantalla de acceso ── */
+  #acceso{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .tarjeta{
+    width:100%;max-width:372px;background:linear-gradient(180deg,var(--panel),var(--fondo));
+    border:1px solid var(--linea);border-radius:16px;padding:34px 28px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.02) inset, 0 30px 70px -30px var(--ac-brillo);
+  }
+  .tarjeta h1{
+    font-size:1.5rem;font-weight:800;letter-spacing:.26em;text-transform:uppercase;
+    margin:0 0 6px;color:var(--ac-luz);text-shadow:0 0 22px var(--ac-brillo);
+  }
+  .tarjeta p.sub{margin:0 0 26px;color:var(--texto-3);font-size:.84rem;letter-spacing:.06em}
+  /* El logo trae su propio fondo negro; el borde y el resplandor lo asientan
+     sobre la tarjeta en vez de dejar un cuadrado flotando. */
+  .logo-acceso{
+    display:block;width:132px;height:132px;margin:0 auto 20px;border-radius:18px;
+    border:1px solid var(--linea);box-shadow:0 0 34px -10px var(--ac-brillo);
+  }
+  label{
+    display:block;font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--texto-3);margin:0 0 8px;
+  }
+  input,textarea,select{
+    width:100%;padding:13px 15px;background:rgba(0,0,0,.45);
+    border:1px solid var(--linea);border-radius:9px;
+    transition:border-color .18s, box-shadow .18s;
+  }
+  input:focus,textarea:focus,select:focus{
+    outline:none;border-color:var(--ac);
+    box-shadow:0 0 0 3px var(--ac-humo), 0 0 18px -4px var(--ac-brillo);
+  }
+  input{margin:0 0 18px}
+
+  button.principal{
+    width:100%;padding:13px;border:1px solid var(--ac);
+    background:linear-gradient(180deg,var(--ac),color-mix(in srgb,var(--ac) 62%,#000));
+    color:#fff;border-radius:9px;font-weight:700;letter-spacing:.07em;cursor:pointer;
+    box-shadow:0 0 18px -5px var(--ac-brillo);
+    transition:box-shadow .18s, transform .12s, filter .18s;
+  }
+  button.principal:hover{box-shadow:0 0 30px -4px var(--ac-brillo);filter:brightness(1.12)}
+  button.principal:active{transform:translateY(1px)}
+  button.principal:disabled{opacity:.45;box-shadow:none;cursor:default}
+
+  .aviso{
+    font-size:.85rem;padding:11px 13px;border-radius:9px;margin:0 0 18px;
+    background:var(--ocupado-fondo);border:1px solid rgba(255,92,122,.4);color:#FFC2CD;
+  }
+  .aviso.bien{background:var(--libre-fondo);border-color:rgba(0,229,160,.38);color:#9DFFDC}
+
+  /* ── Barra ── */
+  header.barra{
+    display:flex;align-items:center;gap:11px;flex-wrap:wrap;
+    padding:12px 20px;background:rgba(12,13,18,.92);backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--linea);position:sticky;top:0;z-index:20;
+  }
+  /* Dos grupos con identidad propia: así el wrap parte por donde tiene
+     sentido y no mezcla el nombre del admin con los botones. */
+  .grupo{display:flex;align-items:center;gap:10px;min-width:0}
+  .grupo.identidad{flex:1 1 auto}
+  .grupo.controles{flex:0 1 auto}
+  .pestanas{display:flex;gap:8px}
+
+  header.barra .marca{
+    font-size:.8rem;font-weight:800;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--ac-luz);text-shadow:0 0 16px var(--ac-brillo);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  header.barra .logo-barra{
+    width:30px;height:30px;border-radius:8px;flex:0 0 auto;
+    border:1px solid var(--linea);
+  }
+  select{
+    padding:8px 11px;background:var(--panel-2);border-radius:8px;cursor:pointer;
+    width:auto;margin:0;max-width:100%;
+  }
+  .crece{flex:1}
+  .quien{font-size:.78rem;color:var(--texto-3);white-space:nowrap}
+  #soloBarbero{font-weight:700;color:var(--texto-2)}
+  .navegacion-semana{display:flex;gap:8px;flex-shrink:0}
+
+  button.chico{
+    padding:8px 14px;background:var(--panel-2);border:1px solid var(--linea);
+    border-radius:8px;cursor:pointer;font-size:.83rem;
+    transition:border-color .18s, color .18s, box-shadow .18s, background .18s;
+  }
+  button.chico:hover{border-color:var(--ac);color:var(--ac-luz);box-shadow:0 0 16px -6px var(--ac-brillo)}
+  button.chico.activo{
+    background:var(--ac-humo);border-color:var(--ac);color:var(--ac-luz);
+    box-shadow:0 0 18px -6px var(--ac-brillo);
+  }
+
+  main{padding:22px 20px 60px;max-width:1320px;margin:0 auto}
+
+  /* ── Semana ── */
+  .semana-cab{display:flex;align-items:center;gap:10px;margin:0 0 16px;flex-wrap:wrap}
+  .semana-cab h2{font-size:1.12rem;font-weight:700;margin:0;flex:1;min-width:190px}
+  .rejilla-envoltorio{
+    overflow-x:auto;border:1px solid var(--linea);border-radius:14px;
+    background:linear-gradient(180deg,var(--panel),var(--fondo));
+    box-shadow:0 24px 60px -34px var(--ac-brillo);
+  }
+  table.rejilla{border-collapse:separate;border-spacing:0;width:100%;min-width:720px}
+  table.rejilla th,table.rejilla td{border-bottom:1px solid var(--linea-2);border-right:1px solid var(--linea-2);padding:0}
+  table.rejilla tr td:last-child,table.rejilla tr th:last-child{border-right:none}
+  table.rejilla tbody tr:last-child td{border-bottom:none}
+  table.rejilla thead th{
+    background:rgba(16,18,25,.96);backdrop-filter:blur(8px);
+    padding:11px 6px;font-size:.75rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    position:sticky;top:0;z-index:5;
+  }
+  table.rejilla thead th.hoy{color:var(--ac-luz);box-shadow:inset 0 -2px 0 var(--ac)}
+  table.rejilla thead th small{display:block;font-weight:400;color:var(--texto-3);font-size:.64rem;letter-spacing:.04em}
+  /* Un festivo se trabaja con la jornada del domingo: sin avisar, un lunes
+     con horas de domingo parece un error del panel. */
+  table.rejilla thead th.festivo small{color:var(--ac-luz)}
+
+  /*
+    ⚠️ LA COLUMNA DE HORAS VA FIJA.
+    La tabla se desplaza en horizontal, y sin esto la hora se sale por la
+    izquierda: en el móvil quedaba una rejilla de celdas de colores sin
+    saber a qué hora correspondía cada fila. El fondo tiene que ser OPACO,
+    o el contenido que pasa por debajo se transparenta.
+  */
+  td.hora{
+    position:sticky;left:0;z-index:4;
+    background:#141720;padding:7px 12px;font-size:.76rem;color:var(--texto-2);
+    white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;
+    box-shadow:1px 0 0 var(--linea);
+  }
+  table.rejilla thead th:first-child{
+    position:sticky;left:0;z-index:7;background:#141720;
+    box-shadow:1px 0 0 var(--linea);
+  }
+
+  .celda{
+    width:100%;min-height:46px;border:none;background:transparent;color:inherit;
+    display:block;padding:7px 8px;text-align:left;font-size:.73rem;line-height:1.32;
+    cursor:pointer;transition:background .16s, box-shadow .16s;
+  }
+  .celda:disabled{cursor:default}
+  .celda .quien-celda{font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .celda .tel{color:var(--texto-3);font-size:.67rem;font-variant-numeric:tabular-nums}
+  .celda .etiqueta{font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;opacity:.6;display:block}
+
+  td.libre .celda{background:var(--libre-fondo);color:var(--libre)}
+  td.libre .celda:hover:not(:disabled){
+    background:rgba(0,229,160,.17);
+    box-shadow:inset 0 0 0 1px var(--libre), inset 0 0 22px -8px var(--libre);
+  }
+  td.libre .celda:disabled{opacity:.22}
+
+  /* Sin :hover y sin cursor de mano: el turno de un cliente solo se mira,
+     no se cancela desde el panel. Que parezca pulsable es prometer algo que
+     el servidor rechaza. */
+  td.ocupado .celda{background:var(--ocupado-fondo);color:#FFD3DC;box-shadow:inset 3px 0 0 var(--ocupado);cursor:default}
+
+  td.bloqueado .celda{background:var(--bloqueo-fondo);color:#FFDFA8;box-shadow:inset 3px 0 0 var(--bloqueo)}
+  td.bloqueado .celda:hover{background:rgba(255,176,32,.17)}
+
+  td.cerrado{
+    background:
+      repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,255,255,.018) 6px 12px),
+      rgba(0,0,0,.28);
+  }
+  td.cerrado .celda{color:var(--texto-3);opacity:.3;text-align:center;cursor:default}
+  .fuera{color:var(--ac-luz);font-size:.62rem;letter-spacing:.06em}
+
+  .leyenda{display:flex;gap:18px;flex-wrap:wrap;margin:16px 0 0;font-size:.78rem;color:var(--texto-3)}
+  .leyenda span{display:flex;align-items:center;gap:7px}
+  .punto{width:12px;height:12px;border-radius:4px;display:inline-block}
+
+  /* ── Horarios ── */
+  .dia-fila{
+    display:flex;gap:14px;align-items:flex-start;padding:14px 16px;
+    border:1px solid var(--linea-2);border-radius:11px;margin:0 0 9px;
+    background:linear-gradient(180deg,var(--panel),transparent);
+    transition:border-color .18s;
+  }
+  .dia-fila:focus-within{border-color:var(--ac)}
+  .dia-nombre{
+    width:104px;flex-shrink:0;font-weight:700;font-size:.84rem;padding-top:11px;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--texto-2);
+  }
+  .dia-fila textarea{
+    flex:1;min-height:50px;margin:0;
+    font:13px/1.65 ui-monospace,Consolas,monospace;resize:vertical;letter-spacing:.04em;
+  }
+  .dia-cuenta{
+    width:74px;flex-shrink:0;text-align:right;font-size:.74rem;color:var(--texto-3);
+    padding-top:13px;font-variant-numeric:tabular-nums;
+  }
+  .ayuda{font-size:.85rem;color:var(--texto-3);margin:0 0 16px;max-width:70ch}
+  .pie-acciones{display:flex;gap:12px;align-items:center;margin:20px 0 0;flex-wrap:wrap}
+
+  .cargando{padding:46px;text-align:center;color:var(--texto-3);letter-spacing:.08em}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* ── Móvil ── */
+  @media(max-width:720px){
+    header.barra{padding:11px 14px;gap:9px}
+    .grupo{flex:1 1 100%}
+    .grupo.controles{gap:8px}
+    .grupo.controles select{flex:1 1 0;min-width:0}
+    .grupo.controles .crece{display:none}
+    .pestanas{flex:0 0 auto}
+    .quien{display:none}
+    #soloBarbero{display:inline}   /* este sí hace falta: dice de quién es la agenda */
+
+    .semana-cab h2{flex:1 1 100%;font-size:1rem;margin:0 0 2px}
+    .navegacion-semana{flex:1 1 100%}
+    .navegacion-semana button{flex:1}
+
+    main{padding:14px 10px 46px}
+    .rejilla-envoltorio{border-radius:11px}
+    table.rejilla{min-width:620px}
+    td.hora{padding:6px 8px;font-size:.72rem}
+    .celda{min-height:42px;padding:6px;font-size:.7rem}
+    .leyenda{gap:10px 14px;font-size:.73rem}
+  }
+
+  @media(max-width:560px){
+    .dia-fila{flex-wrap:wrap;gap:9px}
+    .dia-nombre,.dia-cuenta{width:auto;padding-top:0}
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════ ACCESO ══════════ -->
+<section id="acceso">
+  <form class="tarjeta" id="formAcceso">
+    <img class="logo-acceso" src="/panel/logo.png" alt="Barbería Demo" width="132" height="132">
+    <p class="sub">Panel · Agenda y horarios</p>
+
+    <div id="avisoAcceso" class="aviso" hidden></div>
+
+    <label for="telefono">Tu número de WhatsApp</label>
+    <input id="telefono" type="tel" inputmode="numeric" autocomplete="username"
+           placeholder="3001234567" required>
+
+    <label for="contrasena">Contraseña</label>
+    <input id="contrasena" type="password" autocomplete="current-password"
+           placeholder="••••••••" required>
+
+    <button class="principal" type="submit" id="btnEntrar">Entrar</button>
+  </form>
+</section>
+
+<!-- ══════════ PANEL ══════════ -->
+<div id="panel" hidden>
+  <header class="barra">
+    <div class="grupo identidad">
+      <img class="logo-barra" src="/panel/logo.png" alt="" width="30" height="30">
+      <span class="marca" id="marcaPanel">Panel</span>
+      <span class="crece"></span>
+      <span class="quien" id="quien"></span>
+      <button class="chico" id="btnSalir">Salir</button>
+    </div>
+
+    <div class="grupo controles">
+      <select id="selBarberia" hidden></select>
+      <select id="selBarbero"></select>
+      <span class="quien" id="soloBarbero" hidden></span>
+      <span class="crece"></span>
+      <div class="pestanas">
+        <button class="chico activo" id="tabAgenda">Agenda</button>
+        <button class="chico" id="tabHorarios">Horarios</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="vistaAgenda">
+      <div class="semana-cab">
+        <h2 id="rotuloSemana">—</h2>
+        <div class="navegacion-semana">
+          <button class="chico" id="btnAnterior">←</button>
+          <button class="chico" id="btnHoy">Hoy</button>
+          <button class="chico" id="btnSiguiente">→</button>
+        </div>
+      </div>
+
+      <div class="rejilla-envoltorio">
+        <table class="rejilla" id="rejilla">
+          <thead><tr id="cabRejilla"></tr></thead>
+          <tbody id="cuerpoRejilla"><tr><td class="cargando" colspan="8">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="leyenda">
+        <span><i class="punto" style="background:var(--libre-fondo);box-shadow:0 0 0 1px var(--libre)"></i> Libre — toca para bloquear</span>
+        <span><i class="punto" style="background:var(--ocupado-fondo);box-shadow:0 0 0 1px var(--ocupado)"></i> Turno de cliente — solo lo cancela él</span>
+        <span><i class="punto" style="background:var(--bloqueo-fondo);box-shadow:0 0 0 1px var(--bloqueo)"></i> Bloqueado — toca para liberar</span>
+        <span><i class="punto" style="background:rgba(0,0,0,.4);box-shadow:0 0 0 1px var(--linea)"></i> No trabaja</span>
+      </div>
+    </section>
+
+    <section id="vistaHorarios" hidden>
+      <p class="ayuda">
+        Una hora por línea, en formato <b>HH:MM</b> (24 horas). Un día vacío significa que no trabaja.
+        Los cambios afectan a los turnos <b>nuevos</b>; los ya agendados no se tocan.
+      </p>
+      <div id="avisoHorarios" class="aviso" hidden></div>
+      <div id="diasHorarios"></div>
+      <div class="pie-acciones">
+        <button class="principal" style="width:auto;padding:12px 26px" id="btnGuardarHorarios">Guardar horarios</button>
+        <span class="quien" id="estadoHorarios"></span>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+
+let yo = null, barberoActual = null, lunesActual = null;
+
+async function api(ruta, opciones = {}) {
+  const r = await fetch(ruta, {
+    ...opciones,
+    headers: { 'Content-Type': 'application/json', ...(opciones.headers ?? {}) },
+  });
+  if (r.status === 401 && ruta !== '/panel/api/entrar') { mostrarAcceso(); throw new Error('sin sesión'); }
+  const datos = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(datos.error || `Error ${r.status}`);
+  return datos;
+}
+
+function aviso(el, texto, bien = false) {
+  el.textContent = texto;
+  el.className = 'aviso' + (bien ? ' bien' : '');
+  el.hidden = !texto;
+}
+
+const escapar = (t) => String(t ?? '').replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+/**
+ * Tiñe el panel con el color de la barbería.
+ *
+ * El acento no está fijo en el CSS: este panel lo usan todas las barberías,
+ * y el morado de la barbería piloto escrito en el código haría que la barbería 2
+ * entrara a los colores de otro negocio.
+ */
+function aplicarColor(hex) {
+  if (!/^#[0-9a-f]{6}$/i.test(hex ?? '')) return;
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  const raiz = document.documentElement.style;
+  raiz.setProperty('--ac', hex);
+  raiz.setProperty('--ac-luz', `rgb(${Math.min(255,r+72)} ${Math.min(255,g+72)} ${Math.min(255,b+72)})`);
+  raiz.setProperty('--ac-humo', `rgba(${r},${g},${b},.15)`);
+  raiz.setProperty('--ac-brillo', `rgba(${r},${g},${b},.55)`);
+}
+
+/* ══════════ Acceso ══════════ */
+function mostrarAcceso() { $('#acceso').hidden = false; $('#panel').hidden = true; }
+
+$('#formAcceso').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('#btnEntrar');
+  btn.disabled = true;
+  try {
+    await api('/panel/api/entrar', {
+      method: 'POST',
+      body: JSON.stringify({
+        telefono: $('#telefono').value,
+        contrasena: $('#contrasena').value,
+      }),
+    });
+    await arrancar();
+  } catch (err) {
+    aviso($('#avisoAcceso'), err.message);
+    $('#contrasena').value = '';
+    $('#contrasena').focus();
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('#btnSalir').addEventListener('click', async () => {
+  await api('/panel/api/salir', { method: 'POST' });
+  location.reload();
+});
+
+/* ══════════ Arranque ══════════ */
+async function arrancar() {
+  yo = await api('/panel/api/yo');
+
+  $('#acceso').hidden = true;
+  $('#panel').hidden = false;
+  $('#quien').textContent = yo.nombre + (yo.global ? ' · todas' : '');
+
+  if (yo.global && yo.barberias.length > 1) {
+    const sel = $('#selBarberia');
+    sel.hidden = false;
+    sel.innerHTML = yo.barberias.map(b => `<option value="${b.id}">${escapar(b.nombre)}</option>`).join('');
+    sel.onchange = llenarBarberos;
+  }
+
+  llenarBarberos();
+}
+
+function llenarBarberos() {
+  const barberiaId = $('#selBarberia').hidden
+    ? yo.barberias[0]?.id
+    : Number($('#selBarberia').value);
+
+  const barberia = yo.barberias.find(b => b.id === barberiaId);
+  aplicarColor(barberia?.color);
+  $('#marcaPanel').textContent = barberia?.nombre ?? 'Panel';
+
+  const suyos = yo.barberos.filter(b => b.barberia_id === barberiaId);
+  $('#selBarbero').innerHTML = suyos.map(b => `<option value="${b.id}">${escapar(b.nombre)}</option>`).join('');
+
+  // Un barbero que solo se ve a sí mismo no necesita elegir: se le muestra
+  // su nombre como rótulo en vez de un desplegable de una sola opción.
+  $('#selBarbero').hidden = yo.soloUnBarbero;
+  $('#soloBarbero').hidden = !yo.soloUnBarbero;
+  $('#soloBarbero').textContent = suyos[0]?.nombre ?? '';
+
+  barberoActual = suyos[0]?.id ?? null;
+  lunesActual = null;
+  if (barberoActual) cargarSemana();
+}
+
+$('#selBarbero').addEventListener('change', () => {
+  barberoActual = Number($('#selBarbero').value);
+  if ($('#vistaHorarios').hidden) cargarSemana(); else cargarHorarios();
+});
+
+/* ══════════ Pestañas ══════════ */
+$('#tabAgenda').addEventListener('click', () => {
+  $('#tabAgenda').classList.add('activo'); $('#tabHorarios').classList.remove('activo');
+  $('#vistaAgenda').hidden = false; $('#vistaHorarios').hidden = true;
+  cargarSemana();
+});
+$('#tabHorarios').addEventListener('click', () => {
+  $('#tabHorarios').classList.add('activo'); $('#tabAgenda').classList.remove('activo');
+  $('#vistaHorarios').hidden = false; $('#vistaAgenda').hidden = true;
+  cargarHorarios();
+});
+
+/* ══════════ Agenda ══════════ */
+async function cargarSemana() {
+  const q = new URLSearchParams({ barbero: barberoActual });
+  if (lunesActual) q.set('lunes', lunesActual);
+
+  const s = await api('/panel/api/semana?' + q);
+  lunesActual = s.lunes;
+  $('#rotuloSemana').textContent = s.rotulo;
+
+  // El pie de cada día: 'cerrado' manda sobre 'festivo', porque si no
+  // trabaja da igual por qué. El nombre del festivo va en el title.
+  $('#cabRejilla').innerHTML =
+    '<th></th>' + s.dias.map(d => {
+      const pie = !d.trabaja ? 'cerrado' : d.festivo ? 'festivo' : '&nbsp;';
+      const clases = [d.esHoy ? 'hoy' : '', d.festivo ? 'festivo' : ''].filter(Boolean).join(' ');
+      const titulo = d.festivo ? ` title="${d.festivo} — se trabaja con el horario del domingo"` : '';
+      return `<th class="${clases}"${titulo}>${d.corto} ${d.numero}<small>${pie}</small></th>`;
+    }).join('');
+
+  if (s.horas.length === 0) {
+    $('#cuerpoRejilla').innerHTML =
+      '<tr><td class="cargando" colspan="8">Este barbero no tiene horarios configurados.</td></tr>';
+    return;
+  }
+
+  $('#cuerpoRejilla').innerHTML = s.horas.map(h => {
+    const celdas = s.dias.map(d => {
+      const c = d.celdas[h.valor];
+      const pasado = d.esPasado;
+
+      if (c.estado === 'cerrado') return '<td class="cerrado"><span class="celda">—</span></td>';
+
+      if (c.estado === 'libre') {
+        return `<td class="libre"><button class="celda" ${pasado ? 'disabled' : ''}
+          data-accion="bloquear" data-fecha="${d.fecha}" data-hora="${h.valor}"
+          >${pasado ? '' : '<span class="etiqueta">libre</span>'}</button></td>`;
+      }
+
+      const fuera = c.fueraDeJornada ? '<span class="fuera">fuera de jornada</span>' : '';
+
+      if (c.estado === 'bloqueado') {
+        return `<td class="bloqueado"><button class="celda" data-accion="liberar" data-turno="${c.turnoId}" data-tipo="bloqueo">
+          <span class="etiqueta">bloqueado</span><span class="quien-celda">Descanso</span>${fuera}</button></td>`;
+      }
+
+      // El turno de un cliente NO se toca desde aquí: solo se mira. Por eso
+      // es un span y no un button — no hay nada que pulsar. El servidor lo
+      // rechaza igual, esto solo evita ofrecer algo que no se puede hacer.
+      return `<td class="ocupado"><span class="celda">
+        <span class="quien-celda">${escapar(c.nombre)}</span>
+        <span class="tel">${escapar(c.telefono)}</span>${fuera}</span></td>`;
+    }).join('');
+
+    return `<tr><td class="hora">${h.visible}</td>${celdas}</tr>`;
+  }).join('');
+}
+
+$('#cuerpoRejilla').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-accion]');
+  if (!btn || btn.disabled) return;
+
+  try {
+    if (btn.dataset.accion === 'bloquear') {
+      await api('/panel/api/bloquear', {
+        method: 'POST',
+        body: JSON.stringify({ barbero: barberoActual, fecha: btn.dataset.fecha, hora: btn.dataset.hora }),
+      });
+    } else {
+      // Solo llegan aquí los bloqueos: la celda de una cita ya no es un
+      // botón. Aun así el servidor comprueba el tipo.
+      await api('/panel/api/liberar', {
+        method: 'POST',
+        body: JSON.stringify({ turno: Number(btn.dataset.turno) }),
+      });
+    }
+    await cargarSemana();
+  } catch (err) {
+    alert(err.message);
+    await cargarSemana();
+  }
+});
+
+$('#btnAnterior').addEventListener('click', () => { lunesActual = correr(lunesActual, -7); cargarSemana(); });
+$('#btnSiguiente').addEventListener('click', () => { lunesActual = correr(lunesActual, 7); cargarSemana(); });
+$('#btnHoy').addEventListener('click', () => { lunesActual = null; cargarSemana(); });
+
+function correr(iso, dias) {
+  const [a, m, d] = iso.split('-').map(Number);
+  const t = new Date(Date.UTC(a, m - 1, d));
+  t.setUTCDate(t.getUTCDate() + dias);
+  return t.toISOString().slice(0, 10);
+}
+
+/* ══════════ Horarios ══════════ */
+async function cargarHorarios() {
+  const h = await api('/panel/api/horarios?barbero=' + barberoActual);
+  aviso($('#avisoHorarios'), '');
+  $('#estadoHorarios').textContent = '';
+
+  // Lunes primero: es como piensa la semana cualquiera que trabaje.
+  const orden = [1, 2, 3, 4, 5, 6, 0];
+
+  $('#diasHorarios').innerHTML = orden.map(d => `
+    <div class="dia-fila">
+      <div class="dia-nombre">${DIAS[d]}</div>
+      <textarea data-dia="${d}" rows="${Math.max(2, Math.ceil(h.dias[d].length / 4))}"
+        placeholder="No trabaja">${h.dias[d].join('\n')}</textarea>
+      <div class="dia-cuenta" data-cuenta="${d}">${h.dias[d].length} turnos</div>
+    </div>`).join('');
+
+  $('#diasHorarios').querySelectorAll('textarea').forEach(t => {
+    t.addEventListener('input', () => {
+      const n = t.value.split('\n').filter(l => l.trim()).length;
+      $(`[data-cuenta="${t.dataset.dia}"]`).textContent = n + ' turnos';
+    });
+  });
+}
+
+$('#btnGuardarHorarios').addEventListener('click', async () => {
+  const dias = Array.from({ length: 7 }, () => []);
+  $('#diasHorarios').querySelectorAll('textarea').forEach(t => {
+    dias[Number(t.dataset.dia)] = t.value.split('\n').map(l => l.trim()).filter(Boolean);
+  });
+
+  try {
+    const r = await api('/panel/api/horarios', {
+      method: 'POST',
+      body: JSON.stringify({ barbero: barberoActual, dias }),
+    });
+    aviso($('#avisoHorarios'), `Guardado. ${r.total} turnos en la semana.`, true);
+  } catch (err) {
+    aviso($('#avisoHorarios'), err.message);
+  }
+});
+
+/* ══════════ Inicio ══════════ */
+arrancar().catch(() => mostrarAcceso());
+</script>
+</body>
+</html>

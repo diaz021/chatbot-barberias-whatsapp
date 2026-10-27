@@ -1,0 +1,28 @@
+{
+  "name": "chatbot-barberias-whatsapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chatbot de agendamiento por WhatsApp para barberías: multi-tenant, panel web y recordatorios automáticos",
+  "author": "Juan Esteban Díaz (https://github.com/diaz021)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/diaz021/chatbot-barberias-whatsapp"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js",
+    "migrar": "node db/migrar.js",
+    "test": "node --test --import ./tests/preparar.mjs \"tests/**/*.test.js\"",
+    "e2e": "node tests/e2e-webhook.mjs",
+    "clave": "node db/clave-barbero.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.2.1",
+    "pg": "^8.13.1"
+  }
+}

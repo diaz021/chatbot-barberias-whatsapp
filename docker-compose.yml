@@ -1,0 +1,11 @@
+# Postgres para correr el proyecto y las pruebas en local.
+#   docker compose up -d
+#   DATABASE_URL=postgresql://postgres:CAMBIAME@localhost:54329/barberias
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: CAMBIAME
+      POSTGRES_DB: barberias
+    ports:
+      - "54329:5432"
